@@ -56,8 +56,8 @@ yarn build
  ### Отображения (View)
 
     Класс                  Назначение                                          Методы                                   
- `ProductListView`  Отображает список товаров               `render(products)`, `bindSelect(handler)` 
- `CartView`         Отображает корзину                      `render(items)`, `bindRemove(handler)`, `bindSubmit(handler` 
+ `ProductListView`  Отображает список товаров               `render(products)` 
+ `CartView`         Отображает корзину                      `render(items)`, `remove(handler)`, `submit(handler)` 
  `OrderFormView`    Отображает и собирает данные формы      `render()`, `bindSubmit(handler)`, `getFormData()` 
 
  ###  Презентеры (Presenter)
