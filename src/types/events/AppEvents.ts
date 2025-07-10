@@ -1,4 +1,7 @@
-export type AppEvents = 
+export type AppEvents =
   | 'product:select'
   | 'cart:add'
-  | 'order:submit';
+  | 'cart:remove'
+  | 'order:submit'
+  | 'form:change'
+  | 'app:navigate';

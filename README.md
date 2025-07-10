@@ -40,3 +40,29 @@ npm run build
 ```
 yarn build
 ```
+Приложение построено по архитектурному паттерну **MVP (Model-View-Presenter)**.  
+
+- **Model** — бизнес-логика и данные;
+- **View** — отображение и взаимодействие с DOM;
+- **Presenter** — посредник, обрабатывающий события и управляющий обновлением модели и представления.
+
+### Модели (Model)
+
+    Класс                Назначение                           Методы и атрибуты                           
+ `ProductModel`  Хранение списка товаров             `setProducts`, `getAll`, `getProductById`   
+ `CartModel`     Управление корзиной                 `addToCart`, `removeFromCart`, `getItems`, `clearCart` 
+ `OrderModel`    Работа с данными заказа             `setFormData`, `getFormData`, `submit`      
+
+ ### Отображения (View)
+
+    Класс                  Назначение                                          Методы                                   
+ `ProductListView`  Отображает список товаров               `render(products)`, `bindSelect(handler)` 
+ `CartView`         Отображает корзину                      `render(items)`, `bindRemove(handler)`, `bindSubmit(handler` 
+ `OrderFormView`    Отображает и собирает данные формы      `render()`, `bindSubmit(handler)`, `getFormData()` 
+
+ ###  Презентеры (Presenter)
+
+    Класс                        Назначение                             Методы                                        
+ `ProductPresenter`  Инициализация списка, обработка кликов  `init()`, `onProductSelect(id)`               
+ `CartPresenter`     Добавление/удаление из корзины          `onAddToCart(id)`, `onRemove(id)`, `onSubmit()` 
+ `AppPresenter`      Управление навигацией и инициализацией  `init()`, `switchView(view)`                  
