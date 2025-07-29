@@ -46,23 +46,69 @@ yarn build
 - **View** — отображение и взаимодействие с DOM;
 - **Presenter** — посредник, обрабатывающий события и управляющий обновлением модели и представления.
 
-### Модели (Model)
 
-    Класс                Назначение                           Методы и атрибуты                           
- `ProductModel`  Хранение списка товаров             `setProducts`, `getAll`, `getProductById`   
- `CartModel`     Управление корзиной                 `addToCart`, `removeFromCart`, `getItems`, `clearCart` 
- `OrderModel`    Работа с данными заказа             `setFormData`, `getFormData`, `submit`      
+## Модели (Model)
 
- ### Отображения (View)
+### `ProductModel`
+Хранит список товаров, полученных с сервера.
 
-    Класс                  Назначение                                          Методы                                   
- `ProductListView`  Отображает список товаров               `render(products)` 
- `CartView`         Отображает корзину                      `render(items)`, `remove(handler)`, `submit(handler)` 
- `OrderFormView`    Отображает и собирает данные формы      `render()`, `bindSubmit(handler)`, `getFormData()` 
+- **Поля:**
+  - `products: IProduct[]` — массив объектов товаров.
 
- ###  Презентеры (Presenter)
+- **Методы:**
+  - `setProducts(products: IProduct[])` — сохраняет список товаров.
+  - `getAll()` — возвращает все товары.
+  - `getProductById(id: string)` — находит товар по ID.
 
-    Класс                        Назначение                             Методы                                        
- `ProductPresenter`  Инициализация списка, обработка кликов  `init()`, `onProductSelect(id)`               
- `CartPresenter`     Добавление/удаление из корзины          `onAddToCart(id)`, `onRemove(id)`, `onSubmit()` 
- `AppPresenter`      Управление навигацией и инициализацией  `init()`, `switchView(view)`                  
+
+### `CartModel`
+Отвечает за работу с корзиной товаров.
+
+- **Поля:**
+  - `cart: Record<string, number>` — словарь с ID товара и количеством.
+
+- **Методы:**
+  - `addToCart(id: string)` — добавляет товар или увеличивает его количество.
+  - `removeFromCart(id: string)` — удаляет товар из корзины.
+  - `getItems()` — возвращает содержимое корзины.
+  - `clearCart()` — очищает корзину.
+
+
+### `OrderModel`
+Управляет состоянием и данными формы заказа.
+
+- **Поля:**
+  - `formData: IOrderForm` — объект с данными формы (имя, телефон, адрес).
+
+- **Методы:**
+  - `setFormData(data: IOrderForm)` — сохраняет данные формы.
+  - `getFormData()` — возвращает текущие данные формы.
+  - `submit()` — отправка заказа (например, через API).
+
+## Представления (View)
+
+### `ProductListView`
+Отображает список товаров каталога.
+
+- `render(products: IProduct[])` — отрисовывает карточки товаров.
+
+### `CartView`
+Отображает содержимое корзины.
+
+- `render(items: IBasketItem[])` — показывает товары.
+- `remove(handler)` — подписка на удаление товара.
+- `submit(handler)` — подписка на оформление заказа.
+
+### `OrderFormView`
+Отображает форму заказа и предоставляет доступ к её данным.
+
+- `render()` — отрисовывает форму.
+- `bindSubmit(handler)` — подписка на отправку формы.
+- `getFormData()` — получает значения из полей формы.
+
+## Связь между слоями (Presenter)
+
+Вся логика взаимодействия между `Model` и `View` реализована в файле `index.ts` с использованием `EventEmitter`.
+
+`Presenter` слушает события от представлений (View), обновляет данные в моделях и инициирует перерисовку соответствующих компонентов.
+       
