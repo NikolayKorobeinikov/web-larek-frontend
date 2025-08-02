@@ -1,5 +1,6 @@
 export interface IOrderForm {
-  name: string;
-  phone: string;
+  payment: 'online' | 'cash';
   address: string;
+  email: string;
+  phone: string;
 }

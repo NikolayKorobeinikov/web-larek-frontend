@@ -1,21 +1,17 @@
 import { IOrderForm } from '../../types/model/OrderForm';
 
 export class OrderModel {
-  private formData: IOrderForm;
+  private data: Partial<IOrderForm> = {};
 
-  constructor() {
-    this.formData = { name: '', phone: '', address: '' };
+  set<K extends keyof IOrderForm>(key: K, value: IOrderForm[K]) {
+    this.data[key] = value;
   }
 
-  setFormData(data: IOrderForm) {
-    this.formData = data;
+  get(): Readonly<IOrderForm> {
+    return this.data as IOrderForm;
   }
 
-  getFormData(): IOrderForm {
-    return this.formData;
+  reset() {
+    this.data = {};
   }
-
-  // submit() {
-    
-  // }
 }

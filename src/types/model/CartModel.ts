@@ -1,19 +1,30 @@
 export class CartModel {
-  private cart: Record<string, number> = {};
+  private items: Record<string, number> = {};
 
-  addToCart(id: string) {
-    this.cart[id] = (this.cart[id] || 0) + 1;
+  add(id: string) {
+    this.items[id] = (this.items[id] || 0) + 1;
   }
 
-  removeFromCart(id: string) {
-    delete this.cart[id];
+  remove(id: string) {
+    delete this.items[id];
   }
 
-  getItems(): Record<string, number> {
-    return this.cart;
+  list() {
+    return { ...this.items };
   }
 
-  clearCart() {
-    this.cart = {};
+  clear() {
+    this.items = {};
+  }
+
+  count() {
+    return Object.values(this.items).reduce((a, b) => a + b, 0);
+  }
+
+  total(products: Array<{ id: string; price: number }>) {
+    return Object.entries(this.items).reduce((sum, [id, qty]) => {
+      const pr = products.find(p => p.id === id);
+      return sum + (pr?.price ?? 0) * qty;
+    }, 0);
   }
 }

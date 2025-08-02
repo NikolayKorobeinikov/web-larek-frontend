@@ -3,15 +3,15 @@ import { IProduct } from '../../types/model/Product';
 export class ProductModel {
   private products: IProduct[] = [];
 
-  setProducts(products: IProduct[]) {
-    this.products = products;
+  setProducts(list: IProduct[]) {
+    this.products = list;
   }
 
-  getAll(): IProduct[] {
+  getAll() {
     return this.products;
   }
 
-  getProductById(id: string): IProduct | undefined {
-    return this.products.find((p) => p.id === id);
+  getById(id: string) {
+    return this.products.find(p => p.id === id);
   }
 }
