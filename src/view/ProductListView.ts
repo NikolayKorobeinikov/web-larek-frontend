@@ -17,7 +17,6 @@ export class ProductListView implements IView<IProduct[]> {
     this.container = container;
     this.template = template;
 
-    // ЕДИНСТВЕННЫЙ обработчик кликов — не дублируется при повторных render()
     this.container.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.card');
       if (!btn) return;
@@ -32,7 +31,6 @@ export class ProductListView implements IView<IProduct[]> {
     const nodes = products.map((p) => {
       const node = this.template.content.firstElementChild!.cloneNode(true) as HTMLButtonElement;
 
-      // ВАЖНО: кладём id в data-атрибут, чтобы делегированный обработчик его прочитал
       node.classList.add('card');
       node.dataset.id = p.id;
 
@@ -49,7 +47,6 @@ export class ProductListView implements IView<IProduct[]> {
       return node;
     });
 
-    // заменяем детей одним действием — безопасно вызывать сколь угодно раз
     this.container.replaceChildren(...nodes);
   }
 

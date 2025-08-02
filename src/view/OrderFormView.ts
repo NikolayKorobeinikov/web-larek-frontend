@@ -22,7 +22,7 @@ export class OrderFormView {
   }
 
   getFormData(): IOrderForm {
-    // Подгоните селекторы под ваш HTML шага оформления
+    
     const paymentBtnSelected = this.root.querySelector<HTMLButtonElement>('.order__buttons .button:not(.button_alt)');
     const payment = (paymentBtnSelected?.getAttribute('name') as 'online' | 'cash') || 'online';
 
