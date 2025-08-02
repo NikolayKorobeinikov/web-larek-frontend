@@ -1,5 +1,3 @@
-// src/index.ts
-
 import './scss/styles.scss';
 import { EventEmitter } from './components/base/events';
 import { Api } from './components/base/api';
@@ -19,7 +17,17 @@ import { IProduct } from './types/model/Product';
 import { IOrderForm } from './types/model/OrderForm';
 import { IProductDto } from './types/api/dto/ProductDto';
 
-// ------- Вспомогательные функции -------
+
+type ScreenState =
+  | 'loading'
+  | 'catalog'
+  | 'product'
+  | 'cart'
+  | 'order'
+  | 'contacts'
+  | 'success'
+  | 'error';
+
 const priceStr = (n: number) => n.toLocaleString('ru-RU');
 const clone = (id: string) => {
   const t = document.getElementById(id) as HTMLTemplateElement | null;
@@ -27,9 +35,18 @@ const clone = (id: string) => {
   return t.content.firstElementChild!.cloneNode(true) as HTMLElement;
 };
 
-// ------- Инстансы -------
+const setScreen = (state: ScreenState) => {
+  document.body.setAttribute('data-screen', state);
+};
+
+const showLoading = (el: HTMLElement | null, text = 'Загрузка…') => {
+  if (!el) return;
+  el.textContent = text;
+};
+
 const events = new EventEmitter();
 const api = new LarekApi(new Api(API_URL));
+
 const products = new ProductModel();
 const cart = new CartModel();
 const order = new OrderModel();
@@ -38,43 +55,25 @@ const listView = new ProductListView(events);
 const modal = new ModalView();
 const cartCounter = new CartCounterView();
 
-// утилита обновления UI-счётчика корзины
 const updateCartCounter = () => cartCounter.render(cart.count());
 
-// ------- Загрузка начальных данных и заполнение модели -------
 const gallery = document.querySelector('.gallery') as HTMLElement | null;
-if (gallery) gallery.textContent = 'Загрузка…';
 
-api.getProducts()
-  .then((res: IProductDto[] | { items: IProductDto[] }) => {
-    const list = Array.isArray(res) ? res : res.items;
-    const adapted = list.map(adaptProduct); // IProduct[]
-    products.setProducts(adapted);
-    events.emit('products:loaded', { products: adapted as IProduct[] });
-  })
-  .catch(() => {
-    const div = document.createElement('div');
-    div.className = 'modal__error';
-    div.textContent = 'Не удалось получить товары. Попробуйте позже.';
-    modal.open(div);
-  });
 
-// ------- Подписки UI -------
-
-// Рендер каталога
-events.on('products:loaded', ({ products: arr }: { products: IProduct[] }) => {
+function renderCatalog(list: IProduct[]) {
+  setScreen('catalog');
   if (gallery) gallery.textContent = '';
-  listView.render(arr);
+  listView.render(list);
   updateCartCounter();
-});
+}
 
-// Открытие превью карточки
-events.on('product:select', ({ id }: { id: string }) => {
+function openProductPreview(id: string) {
   const p = products.getById(id);
   if (!p) return;
 
-  const node = clone('card-preview');
+  setScreen('product');
 
+  const node = clone('card-preview');
   (node.querySelector('.card__title') as HTMLElement).textContent = p.title;
   (node.querySelector('.card__price') as HTMLElement).textContent = `${priceStr(p.price)} синапсов`;
 
@@ -90,21 +89,11 @@ events.on('product:select', ({ id }: { id: string }) => {
   btn.onclick = () => events.emit(inCart ? 'cart:remove' : 'cart:add', { id });
 
   modal.open(node);
-});
+}
 
-// Добавление/удаление из корзины
-events.on('cart:add', ({ id }: { id: string }) => {
-  cart.add(id);
-  updateCartCounter();
-});
+function openCart() {
+  setScreen('cart');
 
-events.on('cart:remove', ({ id }: { id: string }) => {
-  cart.remove(id);
-  updateCartCounter();
-});
-
-// Просмотр корзины
-events.on('cart:open', () => {
   const node = clone('basket');
   const list = node.querySelector('.basket__list') as HTMLElement;
   const totalEl = node.querySelector('.basket__price') as HTMLElement;
@@ -122,8 +111,10 @@ events.on('cart:open', () => {
 
     const row = clone('card-basket');
     (row.querySelector('.basket__item-index') as HTMLElement).textContent = String(idx++);
-    (row.querySelector('.card__title') as HTMLElement).textContent = p.title + (qty > 1 ? ` ×${qty}` : '');
-    (row.querySelector('.card__price') as HTMLElement).textContent = `${priceStr(p.price * qty)} синапсов`;
+    (row.querySelector('.card__title') as HTMLElement).textContent =
+      p.title + (qty > 1 ? ` ×${qty}` : '');
+    (row.querySelector('.card__price') as HTMLElement).textContent =
+      `${priceStr(p.price * qty)} синапсов`;
 
     row.querySelector<HTMLButtonElement>('.basket__item-delete')!
       .addEventListener('click', () => events.emit('cart:remove', { id }));
@@ -133,13 +124,20 @@ events.on('cart:open', () => {
   });
 
   totalEl.textContent = `${priceStr(total)} синапсов`;
-  goBtn.addEventListener('click', () => events.emit('order:open'));
+
+
+  const hasItems = Object.keys(items).length > 0;
+  goBtn.disabled = !hasItems;
+  if (hasItems) {
+    goBtn.addEventListener('click', () => events.emit('order:open'));
+  }
 
   modal.open(node);
-});
+}
 
-// Шаг 1: окно «Способ оплаты + адрес»
-events.on('order:open', () => {
+function openOrderStep1() {
+  setScreen('order');
+
   const node = clone('order');
   const submit = node.querySelector<HTMLButtonElement>('.order__button')!;
   const errors = node.querySelector<HTMLElement>('.form__errors')!;
@@ -156,7 +154,6 @@ events.on('order:open', () => {
 
   payBtns.forEach((b) => {
     b.addEventListener('click', () => {
-      // ВАЖНО: сопоставляем name из шаблона к ожидаемому типу
       const map: Record<string, 'online' | 'cash'> = { card: 'online', cash: 'cash' };
       payment = map[b.name] ?? null;
 
@@ -177,10 +174,11 @@ events.on('order:open', () => {
 
   validate();
   modal.open(node);
-});
+}
 
-// Шаг 2: окно «Контакты + отправка»
-events.on('contacts:open', () => {
+function openOrderStep2() {
+  setScreen('contacts');
+
   const node = clone('contacts');
   const email = node.querySelector<HTMLInputElement>('input[name="email"]')!;
   const phone = node.querySelector<HTMLInputElement>('input[name="phone"]')!;
@@ -226,16 +224,64 @@ events.on('contacts:open', () => {
 
   validate();
   modal.open(node);
-});
+}
 
-// Шаг 3: успех
-events.on('order:success', () => {
+function openSuccess() {
+  setScreen('success');
+
   const node = clone('success');
   node.querySelector<HTMLButtonElement>('.order-success__close')!
     .addEventListener('click', () => modal.close());
   modal.open(node);
+}
+
+function showError(message: string) {
+  setScreen('error');
+  const div = document.createElement('div');
+  div.className = 'modal__error';
+  div.textContent = message;
+  modal.open(div);
+}
+
+
+setScreen('loading');
+showLoading(gallery);
+
+api.getProducts()
+  .then((res: IProductDto[] | { items: IProductDto[] }) => {
+    const list = Array.isArray(res) ? res : res.items;
+    const adapted = list.map(adaptProduct);
+    products.setProducts(adapted);
+    events.emit('products:loaded', { products: adapted as IProduct[] });
+  })
+  .catch(() => {
+    showError('Не удалось получить товары. Попробуйте позже.');
+  });
+
+
+  events.on('products:loaded', ({ products: arr }: { products: IProduct[] }) => {
+  renderCatalog(arr);
 });
 
-// Кнопка корзины в шапке
+events.on('product:select', ({ id }: { id: string }) => {
+  openProductPreview(id);
+});
+
+events.on('cart:add', ({ id }: { id: string }) => {
+  cart.add(id);
+  updateCartCounter();
+});
+
+events.on('cart:remove', ({ id }: { id: string }) => {
+  cart.remove(id);
+  updateCartCounter();
+});
+
+events.on('cart:open', () => openCart());
+
+events.on('order:open', () => openOrderStep1());
+events.on('contacts:open', () => openOrderStep2());
+events.on('order:success', () => openSuccess());
+
 document.querySelector<HTMLButtonElement>('.header__basket')!
   .addEventListener('click', () => events.emit('cart:open'));
