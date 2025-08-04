@@ -11,16 +11,17 @@ import { CartModel } from './components/models/CartModel';
 import { OrderModel } from './components/models/OrderModel';
 
 import { ProductListView } from './view/ProductListView';
+import { ProductPreviewView } from './view/ProductPreviewView';
+import { CartView } from './view/CartView';
 import { ModalView } from './view/ModalView';
 import { CartCounterView } from './view/CartCounterView';
-import { ProductPreviewView } from './view/ProductPreviewView';
 import { OrderStep1View } from './view/OrderStep1View';
 import { OrderStep2View } from './view/OrderStep2View';
 import { SuccessView } from './view/SuccessView';
-import { CartView } from './view/CartView';
+import { ScreenView } from './view/ScreenView';
 
-import { IProduct } from './types/model/Product';
 import { IProductDto } from './types/api/dto/ProductDto';
+import { IProduct } from './types/model/Product';
 
 const events = new EventEmitter();
 const api = new LarekApi(new Api(API_URL));
@@ -29,38 +30,57 @@ const products = new ProductModel();
 const cart = new CartModel();
 const order = new OrderModel();
 
-const listView = new ProductListView(events);
+const screen = new ScreenView();
 const modal = new ModalView();
-const cartCounter = new CartCounterView();
-const previewView = new ProductPreviewView();
+const productListView = new ProductListView(events);
+const productPreviewView = new ProductPreviewView();
+const cartCounterView = new CartCounterView();
 const orderStep1View = new OrderStep1View();
 const orderStep2View = new OrderStep2View();
 const successView = new SuccessView();
 
-function setScreen(screen: string) {
-  document.body.setAttribute('data-screen', screen);
-}
-
 function updateCartCounter() {
   const count = cart.count();
-  cartCounter.render(count);
+  cartCounterView.render(count);
 }
 
-function renderCatalog(productList: IProduct[]) {
-  setScreen('catalog');
-  listView.render(productList);
+screen.set('loading');
+
+const gallery = document.querySelector<HTMLElement>('.gallery');
+if (gallery) {
+  gallery.textContent = 'Загрузка…';
+}
+
+api.getProducts()
+  .then((response: IProductDto[] | { items: IProductDto[] }) => {
+    const list = Array.isArray(response) ? response : response.items;
+    const adapted = list.map(adaptProduct);
+    products.setProducts(adapted);
+    events.emit('products:loaded', { products: adapted });
+  })
+  .catch(() => {
+    screen.set('error');
+    const errorNode = document.createElement('div');
+    errorNode.className = 'modal__error';
+    errorNode.textContent = 'Не удалось получить товары. Попробуйте позже.';
+    modal.open(errorNode);
+  });
+
+events.on('products:loaded', ({ products }: { products: IProduct[] }) => {
+  screen.set('catalog');
+  productListView.render(products);
   updateCartCounter();
-}
+});
 
-function openProductPreview(id: string) {
+events.on('product:select', ({ id }: { id: string }) => {
   const product = products.getById(id);
   if (!product) return;
 
-  setScreen('product');
+  screen.set('product');
 
   const inCart = !!cart.list()[id];
 
-  const node = previewView.render(product, inCart, () => {
+  const node = productPreviewView.render(product, inCart, () => {
     if (inCart) {
       events.emit('cart:remove', { id });
     } else {
@@ -70,11 +90,42 @@ function openProductPreview(id: string) {
   });
 
   modal.open(node);
-}
+});
 
-function openOrderStep1() {
-  setScreen('order');
+events.on('cart:add', ({ id }: { id: string }) => {
+  cart.add(id);
+  updateCartCounter();
+});
 
+events.on('cart:remove', ({ id }: { id: string }) => {
+  cart.remove(id);
+  updateCartCounter();
+});
+
+events.on('cart:open', () => {
+  const items = Object.keys(cart.list())
+    .map((id) => products.getById(id))
+    .filter((item): item is IProduct => Boolean(item));
+
+  const cartView = new CartView({
+    list: items,
+    onRemove: (id) => {
+      cart.remove(id);
+      updateCartCounter();
+      events.emit('cart:open'); 
+    },
+    onSubmit: () => {
+      modal.close();
+      events.emit('order:open');
+    },
+  });
+
+  screen.set('cart');
+  modal.open(cartView.render());
+});
+
+events.on('order:open', () => {
+  screen.set('order');
   const node = orderStep1View.render();
 
   orderStep1View.bindSubmit((payment, address) => {
@@ -84,11 +135,10 @@ function openOrderStep1() {
   });
 
   modal.open(node);
-}
+});
 
-function openOrderStep2() {
-  setScreen('contacts');
-
+events.on('contacts:open', () => {
+  screen.set('contacts');
   const node = orderStep2View.render();
 
   orderStep2View.bindSubmit(async (email, phone) => {
@@ -110,96 +160,17 @@ function openOrderStep2() {
   });
 
   modal.open(node);
-}
+});
 
-function openSuccess() {
-  setScreen('success');
+events.on('order:success', () => {
+  screen.set('success');
   const node = successView.render();
-  successView.bindClose(() => modal.close());
+
+  successView.bindClose(() => {
+    modal.close();
+  });
+
   modal.open(node);
-}
-
-function showError(message: string) {
-  setScreen('error');
-  const div = document.createElement('div');
-  div.className = 'modal__error';
-  div.textContent = message;
-  modal.open(div);
-}
-
-function showLoading(element: HTMLElement | null, message = 'Загрузка…') {
-  if (element) {
-    element.textContent = message;
-  }
-}
-
-const gallery = document.querySelector<HTMLElement>('.gallery');
-setScreen('loading');
-showLoading(gallery);
-
-api.getProducts()
-  .then((response: IProductDto[] | { items: IProductDto[] }) => {
-    const list = Array.isArray(response) ? response : response.items;
-    const adaptedProducts = list.map(adaptProduct);
-    products.setProducts(adaptedProducts);
-    events.emit('products:loaded', { products: adaptedProducts });
-  })
-  .catch(() => {
-    showError('Не удалось получить товары. Попробуйте позже.');
-  });
-
-
-events.on('products:loaded', ({ products }: { products: IProduct[] }) => {
-  renderCatalog(products);
-});
-
-
-events.on('product:select', ({ id }: { id: string }) => {
-  openProductPreview(id);
-});
-
-
-events.on('cart:add', ({ id }: { id: string }) => {
-  cart.add(id);
-  updateCartCounter();
-});
-
-
-events.on('cart:remove', ({ id }: { id: string }) => {
-  cart.remove(id);
-  updateCartCounter();
-});
-
-
-events.on('order:open', openOrderStep1);
-
-
-events.on('contacts:open', openOrderStep2);
-
-
-events.on('order:success', openSuccess);
-
-
-events.on('cart:open', () => {
-  const cartItems: IProduct[] = Object.keys(cart.list())
-    .map(id => products.getById(id))
-    .filter((item): item is IProduct => Boolean(item));
-
-  const cartView = new CartView({
-    list: cartItems,
-    onRemove: (id) => {
-      cart.remove(id);
-      updateCartCounter();
-      events.emit('cart:open');
-    },
-    onSubmit: () => {
-      modal.close();
-      events.emit('order:open');
-    },
-  });
-
-  setScreen('cart');
-  modal.open(cartView.render());
 });
 
 document.querySelector<HTMLButtonElement>('.header__basket')!
