@@ -37,17 +37,18 @@ const orderStep1View = new OrderStep1View();
 const orderStep2View = new OrderStep2View();
 const successView = new SuccessView();
 
-function setScreen(state: string) {
-  document.body.setAttribute('data-screen', state);
+function setScreen(screen: string) {
+  document.body.setAttribute('data-screen', screen);
 }
 
 function updateCartCounter() {
-  cartCounter.render(cart.count());
+  const count = cart.count();
+  cartCounter.render(count);
 }
 
-function renderCatalog(list: IProduct[]) {
+function renderCatalog(productList: IProduct[]) {
   setScreen('catalog');
-  listView.render(list);
+  listView.render(productList);
   updateCartCounter();
 }
 
@@ -58,8 +59,13 @@ function openProductPreview(id: string) {
   setScreen('product');
 
   const inCart = !!cart.list()[id];
-  const node: HTMLElement = previewView.render(product, inCart, () => {
-    events.emit(inCart ? 'cart:remove' : 'cart:add', { id });
+
+  const node = previewView.render(product, inCart, () => {
+    if (inCart) {
+      events.emit('cart:remove', { id });
+    } else {
+      events.emit('cart:add', { id });
+    }
     modal.close();
   });
 
@@ -69,7 +75,8 @@ function openProductPreview(id: string) {
 function openOrderStep1() {
   setScreen('order');
 
-  const node: HTMLElement = orderStep1View.render();
+  const node = orderStep1View.render();
+
   orderStep1View.bindSubmit((payment, address) => {
     order.set('payment', payment);
     order.set('address', address);
@@ -82,21 +89,23 @@ function openOrderStep1() {
 function openOrderStep2() {
   setScreen('contacts');
 
-  const node: HTMLElement = orderStep2View.render();
+  const node = orderStep2View.render();
+
   orderStep2View.bindSubmit(async (email, phone) => {
     order.set('email', email);
     order.set('phone', phone);
-    const data = order.get();
 
     try {
-      await api.submitOrder(data);
+      await api.submitOrder(order.get());
       cart.clear();
       order.reset();
       updateCartCounter();
       events.emit('order:success');
     } catch {
-      const errorEl = node.querySelector('.form__errors');
-      if (errorEl) errorEl.textContent = 'Ошибка оплаты. Попробуйте позже.';
+      const error = node.querySelector('.form__errors');
+      if (error) {
+        error.textContent = 'Ошибка оплаты. Попробуйте позже.';
+      }
     }
   });
 
@@ -105,21 +114,23 @@ function openOrderStep2() {
 
 function openSuccess() {
   setScreen('success');
-  const node: HTMLElement = successView.render();
+  const node = successView.render();
   successView.bindClose(() => modal.close());
   modal.open(node);
 }
 
 function showError(message: string) {
   setScreen('error');
-  const div: HTMLElement = document.createElement('div');
+  const div = document.createElement('div');
   div.className = 'modal__error';
   div.textContent = message;
   modal.open(div);
 }
 
-function showLoading(el: HTMLElement | null, text = 'Загрузка…') {
-  if (el) el.textContent = text;
+function showLoading(element: HTMLElement | null, message = 'Загрузка…') {
+  if (element) {
+    element.textContent = message;
+  }
 }
 
 const gallery = document.querySelector<HTMLElement>('.gallery');
@@ -127,26 +138,48 @@ setScreen('loading');
 showLoading(gallery);
 
 api.getProducts()
-  .then((res: IProductDto[] | { items: IProductDto[] }) => {
-    const list = Array.isArray(res) ? res : res.items;
-    const adapted = list.map(adaptProduct);
-    products.setProducts(adapted);
-    events.emit('products:loaded', { products: adapted });
+  .then((response: IProductDto[] | { items: IProductDto[] }) => {
+    const list = Array.isArray(response) ? response : response.items;
+    const adaptedProducts = list.map(adaptProduct);
+    products.setProducts(adaptedProducts);
+    events.emit('products:loaded', { products: adaptedProducts });
   })
-  .catch(() => showError('Не удалось получить товары. Попробуйте позже.'));
+  .catch(() => {
+    showError('Не удалось получить товары. Попробуйте позже.');
+  });
+
 
 events.on('products:loaded', ({ products }: { products: IProduct[] }) => {
   renderCatalog(products);
 });
 
-events.on('product:select', ({ id }: { id: string }) => openProductPreview(id));
-events.on('cart:add', ({ id }: { id: string }) => { cart.add(id); updateCartCounter(); });
-events.on('cart:remove', ({ id }: { id: string }) => { cart.remove(id); updateCartCounter(); });
+
+events.on('product:select', ({ id }: { id: string }) => {
+  openProductPreview(id);
+});
+
+
+events.on('cart:add', ({ id }: { id: string }) => {
+  cart.add(id);
+  updateCartCounter();
+});
+
+
+events.on('cart:remove', ({ id }: { id: string }) => {
+  cart.remove(id);
+  updateCartCounter();
+});
+
+
 events.on('order:open', openOrderStep1);
+
+
 events.on('contacts:open', openOrderStep2);
+
+
 events.on('order:success', openSuccess);
 
-// Обработка открытия корзины
+
 events.on('cart:open', () => {
   const cartItems: IProduct[] = Object.keys(cart.list())
     .map(id => products.getById(id))
@@ -157,7 +190,7 @@ events.on('cart:open', () => {
     onRemove: (id) => {
       cart.remove(id);
       updateCartCounter();
-      events.emit('cart:open'); // перерисовываем
+      events.emit('cart:open');
     },
     onSubmit: () => {
       modal.close();
@@ -170,4 +203,6 @@ events.on('cart:open', () => {
 });
 
 document.querySelector<HTMLButtonElement>('.header__basket')!
-  .addEventListener('click', () => events.emit('cart:open'));
+  .addEventListener('click', () => {
+    events.emit('cart:open');
+  });
