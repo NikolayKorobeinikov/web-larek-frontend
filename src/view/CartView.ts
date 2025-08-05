@@ -1,56 +1,30 @@
-import { cloneTemplate } from '../utils/utils';
+import { cloneTemplate, ensureElement } from '../utils/utils';
+import { EventEmitter } from '../components/base/events';
 import { IProduct } from '../types/model/Product';
-
-interface ICartViewOptions {
-	list: IProduct[];
-	onRemove: (id: string) => void;
-	onSubmit: () => void;
-}
+import { CartItemView } from './CartItemView';
 
 export class CartView {
-	private node: HTMLElement;
-	private listNode: HTMLElement;
-	private submitBtn: HTMLButtonElement;
-	private totalPrice: HTMLElement;
+  private node: HTMLElement;
+  private list: HTMLElement;
+  private total: HTMLElement;
 
-	constructor({ list, onRemove, onSubmit }: ICartViewOptions) {
-		this.node = cloneTemplate('#basket');
-		this.listNode = this.node.querySelector('.basket__list')!;
-		this.submitBtn = this.node.querySelector('.basket__button')!;
-		this.totalPrice = this.node.querySelector('.basket__price')!;
+  constructor(private events: EventEmitter) {
+    this.node = cloneTemplate('#basket');
+    this.list = ensureElement<HTMLElement>('.basket__list', this.node);
+    this.total = ensureElement<HTMLElement>('.basket__price', this.node);
+  }
 
-		this.submitBtn.addEventListener('click', (e) => {
-			e.preventDefault();
-			onSubmit();
-		});
+  setItems(items: IProduct[]) {
+    const itemViews = items.map((product, index) =>
+      new CartItemView(product, index + 1, this.events).render()
+    );
+    this.list.replaceChildren(...itemViews);
 
-		this.renderItems(list, onRemove);
-		this.renderTotal(list);
-	}
+    const totalPrice = items.reduce((sum, item) => sum + item.price, 0);
+    this.total.textContent = `${totalPrice} синапсов`;
+  }
 
-	private renderItems(list: IProduct[], onRemove: (id: string) => void) {
-		list.forEach((item, index) => {
-			const itemNode = document.createElement('li');
-			itemNode.className = 'basket__item card card_compact';
-			itemNode.innerHTML = `
-				<span class="basket__item-index">${index + 1}</span>
-				<span class="card__title">${item.title}</span>
-				<span class="card__price">${item.price} синапсов</span>
-				<button class="basket__item-delete card__button" aria-label="удалить"></button>
-			`;
-			itemNode.querySelector('.basket__item-delete')!.addEventListener('click', () => {
-				onRemove(item.id);
-			});
-			this.listNode.appendChild(itemNode);
-		});
-	}
-
-	private renderTotal(list: IProduct[]) {
-		const total = list.reduce((sum, item) => sum + item.price, 0);
-		this.totalPrice.textContent = `${total} синапсов`;
-	}
-
-	render(): HTMLElement {
-		return this.node;
-	}
+  render(): HTMLElement {
+    return this.node;
+  }
 }

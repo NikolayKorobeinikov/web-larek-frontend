@@ -1,17 +1,22 @@
+// components/models/ProductModel.ts
+import { EventEmitter } from '../base/events';
 import { IProduct } from '../../types/model/Product';
 
 export class ProductModel {
   private products: IProduct[] = [];
 
+  constructor(private events: EventEmitter) {}
+
   setProducts(list: IProduct[]) {
     this.products = list;
+    this.events.emit('products:loaded', { products: this.getProducts() });
   }
 
-  getAll() {
-    return this.products;
+  getProducts(): IProduct[] {
+    return [...this.products];
   }
 
-  getById(id: string) {
+  getById(id: string): IProduct | undefined {
     return this.products.find(p => p.id === id);
   }
 }

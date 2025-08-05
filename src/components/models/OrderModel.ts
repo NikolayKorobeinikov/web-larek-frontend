@@ -1,17 +1,49 @@
-import { IOrderForm } from '../../types/model/OrderForm';
+import { EventEmitter } from '../base/events';
+
+export type PaymentType = 'online' | 'cash' | null;
+
+export interface IOrderForm {
+  payment: PaymentType;
+  address: string;
+  email: string;
+  phone: string;
+}
 
 export class OrderModel {
-  private data: Partial<IOrderForm> = {};
+  private data: IOrderForm;
+  private events: EventEmitter;
 
-  set<K extends keyof IOrderForm>(key: K, value: IOrderForm[K]) {
-    this.data[key] = value;
+  constructor(events: EventEmitter) {
+    this.events = events;
+    this.data = {
+      payment: null,
+      address: '',
+      email: '',
+      phone: ''
+    };
   }
 
-  get(): Readonly<IOrderForm> {
-    return this.data as IOrderForm;
+  set(key: 'payment' | 'address' | 'email' | 'phone', value: any) {
+    if (key === 'payment' && value !== 'online' && value !== 'cash' && value !== null) {
+      console.warn(`Неверный способ оплаты: ${value}`);
+      return;
+    }
+
+    (this.data as any)[key] = value;
+
+    this.events.emit('order:change', { key, value });
+  }
+
+  get(): IOrderForm {
+    return { ...this.data };
   }
 
   reset() {
-    this.data = {};
+    this.data = {
+      payment: null,
+      address: '',
+      email: '',
+      phone: ''
+    };
   }
 }

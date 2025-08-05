@@ -1,57 +1,22 @@
-import { IProduct } from '../types/model/Product';
 import { IView } from '../types/base/View';
 import { EventEmitter } from '../components/base/events';
 
-export class ProductListView implements IView<IProduct[]> {
+export class ProductListView implements IView<HTMLElement[]> {
   private container: HTMLElement;
-  private template: HTMLTemplateElement;
-  private data: IProduct[] = [];
 
   constructor(private events: EventEmitter) {
     const container = document.querySelector('.gallery') as HTMLElement | null;
-    const template = document.querySelector<HTMLTemplateElement>('#card-catalog');
-
-    if (!container) throw new Error('ProductListView: .gallery не найден');
-    if (!template) throw new Error('ProductListView: #card-catalog не найден');
-
+    if (!container) {
+      throw new Error('ProductListView: .gallery не найден');
+    }
     this.container = container;
-    this.template = template;
-
-    this.container.addEventListener('click', (e) => {
-      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.card');
-      if (!btn) return;
-      const id = btn.dataset.id;
-      if (id) this.events.emit('product:select', { id });
-    });
   }
 
-  render(products: IProduct[]) {
-    this.data = products;
-
-    const nodes = products.map((p) => {
-      const node = this.template.content.firstElementChild!.cloneNode(true) as HTMLButtonElement;
-
-      node.classList.add('card');
-      node.dataset.id = p.id;
-
-      (node.querySelector('.card__title') as HTMLElement).textContent = p.title;
-      (node.querySelector('.card__price') as HTMLElement).textContent = `${p.price.toLocaleString('ru-RU')} синапсов`;
-      (node.querySelector('.card__category') as HTMLElement).textContent = p.category;
-
-      const img = node.querySelector('.card__image') as HTMLImageElement | null;
-      if (img) {
-        img.src = p.image;
-        img.alt = p.title;
-      }
-
-      return node;
-    });
-
-    this.container.replaceChildren(...nodes);
+  render(productCards: HTMLElement[]) {
+    this.container.replaceChildren(...productCards);
   }
 
   clear() {
-    this.data = [];
     this.container.replaceChildren();
   }
 }

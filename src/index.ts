@@ -1,5 +1,4 @@
 import './scss/styles.scss';
-
 import { EventEmitter } from './components/base/events';
 import { Api } from './components/base/api';
 import { LarekApi } from './api/LarekApi';
@@ -11,14 +10,16 @@ import { CartModel } from './components/models/CartModel';
 import { OrderModel } from './components/models/OrderModel';
 
 import { ProductListView } from './view/ProductListView';
+import { ProductCardView } from './view/ProductCardView';
 import { ProductPreviewView } from './view/ProductPreviewView';
 import { CartView } from './view/CartView';
-import { ModalView } from './view/ModalView';
 import { CartCounterView } from './view/CartCounterView';
-import { OrderStep1View } from './view/OrderStep1View';
+import { OrderFormView } from './view/OrderFormView';
 import { OrderStep2View } from './view/OrderStep2View';
 import { SuccessView } from './view/SuccessView';
 import { ScreenView } from './view/ScreenView';
+import { HeaderView } from './view/HeaderView';
+import { ModalView } from './view/ModalView';
 
 import { IProductDto } from './types/api/dto/ProductDto';
 import { IProduct } from './types/model/Product';
@@ -26,154 +27,115 @@ import { IProduct } from './types/model/Product';
 const events = new EventEmitter();
 const api = new LarekApi(new Api(API_URL));
 
-const products = new ProductModel();
-const cart = new CartModel();
-const order = new OrderModel();
+const productModel = new ProductModel(events);
+const cartModel = new CartModel(events);
+const orderModel = new OrderModel(events);
 
-const screen = new ScreenView();
-const modal = new ModalView();
+const screenView = new ScreenView();
+const modalView = new ModalView(); 
+const headerView = new HeaderView(events);
 const productListView = new ProductListView(events);
 const productPreviewView = new ProductPreviewView();
 const cartCounterView = new CartCounterView();
-const orderStep1View = new OrderStep1View();
+const cartView = new CartView(events);
+const orderFormView = new OrderFormView(events);
 const orderStep2View = new OrderStep2View();
 const successView = new SuccessView();
 
-function updateCartCounter() {
-  const count = cart.count();
-  cartCounterView.render(count);
-}
-
-screen.set('loading');
-
-const gallery = document.querySelector<HTMLElement>('.gallery');
-if (gallery) {
-  gallery.textContent = 'Загрузка…';
-}
+screenView.set('loading');
 
 api.getProducts()
-  .then((response: IProductDto[] | { items: IProductDto[] }) => {
-    const list = Array.isArray(response) ? response : response.items;
-    const adapted = list.map(adaptProduct);
-    products.setProducts(adapted);
-    events.emit('products:loaded', { products: adapted });
+  .then((res: IProductDto[] | { items: IProductDto[] }) => {
+    const list = Array.isArray(res) ? res : res.items;
+    productModel.setProducts(list.map(adaptProduct));
   })
   .catch(() => {
-    screen.set('error');
-    const errorNode = document.createElement('div');
-    errorNode.className = 'modal__error';
-    errorNode.textContent = 'Не удалось получить товары. Попробуйте позже.';
-    modal.open(errorNode);
+    events.emit('error:show', { message: 'Не удалось получить товары. Попробуйте позже.' });
   });
 
 events.on('products:loaded', ({ products }: { products: IProduct[] }) => {
-  screen.set('catalog');
-  productListView.render(products);
-  updateCartCounter();
+  screenView.set('catalog');
+  const cards = products.map(p => new ProductCardView(p, events).render());
+  productListView.render(cards);
 });
 
 events.on('product:select', ({ id }: { id: string }) => {
-  const product = products.getById(id);
+  const product = productModel.getById(id);
   if (!product) return;
 
-  screen.set('product');
-
-  const inCart = !!cart.list()[id];
-
-  const node = productPreviewView.render(product, inCart, () => {
-    if (inCart) {
-      events.emit('cart:remove', { id });
-    } else {
-      events.emit('cart:add', { id });
-    }
-    modal.close();
+  const inCart = cartModel.has(id);
+  const previewNode = productPreviewView.render(product, inCart, () => {
+    events.emit(inCart ? 'cart:remove' : 'cart:add', { id });
+    modalView.close();
   });
 
-  modal.open(node);
+  modalView.open(previewNode);
+  screenView.set('product');
+  window.scrollTo({ top: 0 });
 });
 
 events.on('cart:add', ({ id }: { id: string }) => {
-  cart.add(id);
-  updateCartCounter();
+  const product = productModel.getById(id);
+  if (product) cartModel.add(product);
 });
 
 events.on('cart:remove', ({ id }: { id: string }) => {
-  cart.remove(id);
-  updateCartCounter();
+  cartModel.remove(id);
+});
+
+events.on('cart:changed', ({ items }: { items: IProduct[] }) => {
+  cartCounterView.render(items.length);
+  cartView.setItems(items);
 });
 
 events.on('cart:open', () => {
-  const items = Object.keys(cart.list())
-    .map((id) => products.getById(id))
-    .filter((item): item is IProduct => Boolean(item));
-
-  const cartView = new CartView({
-    list: items,
-    onRemove: (id) => {
-      cart.remove(id);
-      updateCartCounter();
-      events.emit('cart:open'); 
-    },
-    onSubmit: () => {
-      modal.close();
-      events.emit('order:open');
-    },
-  });
-
-  screen.set('cart');
-  modal.open(cartView.render());
+  screenView.set('cart');
+  modalView.open(cartView.render());
+  window.scrollTo({ top: 0 });
 });
 
 events.on('order:open', () => {
-  screen.set('order');
-  const node = orderStep1View.render();
-
-  orderStep1View.bindSubmit((payment, address) => {
-    order.set('payment', payment);
-    order.set('address', address);
-    events.emit('contacts:open');
-  });
-
-  modal.open(node);
+  if (cartModel.getItems().length === 0) {
+    events.emit('error:show', { message: 'Ваша корзина пуста' });
+    return;
+  }
+  screenView.set('order');
+  modalView.open(orderFormView.render());
+  window.scrollTo({ top: 0 });
 });
 
 events.on('contacts:open', () => {
-  screen.set('contacts');
-  const node = orderStep2View.render();
+  screenView.set('contacts');
+  modalView.open(orderStep2View.render());
+  window.scrollTo({ top: 0 });
+});
 
-  orderStep2View.bindSubmit(async (email, phone) => {
-    order.set('email', email);
-    order.set('phone', phone);
+events.on('order:submit', async () => {
+  const data = orderModel.get();
 
-    try {
-      await api.submitOrder(order.get());
-      cart.clear();
-      order.reset();
-      updateCartCounter();
-      events.emit('order:success');
-    } catch {
-      const error = node.querySelector('.form__errors');
-      if (error) {
-        error.textContent = 'Ошибка оплаты. Попробуйте позже.';
-      }
-    }
-  });
+  if (!data.payment || !data.address || !data.email || !data.phone) {
+    events.emit('error:show', { message: 'Заполните все поля' });
+    return;
+  }
 
-  modal.open(node);
+  try {
+    await api.submitOrder(data);
+    cartModel.clear();
+    orderModel.reset();
+    events.emit('order:success');
+  } catch {
+    events.emit('error:show', { message: 'Ошибка оплаты' });
+  }
 });
 
 events.on('order:success', () => {
-  screen.set('success');
-  const node = successView.render();
-
-  successView.bindClose(() => {
-    modal.close();
-  });
-
-  modal.open(node);
+  screenView.set('success');
+  modalView.open(successView.render());
+  window.scrollTo({ top: 0 });
 });
 
-document.querySelector<HTMLButtonElement>('.header__basket')!
-  .addEventListener('click', () => {
-    events.emit('cart:open');
-  });
+events.on('error:show', ({ message }: { message: string }) => {
+  screenView.set('error');
+  modalView.open(successView.renderError(message));
+  window.scrollTo({ top: 0 });
+});

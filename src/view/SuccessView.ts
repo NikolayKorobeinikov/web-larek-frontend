@@ -1,4 +1,4 @@
-import { cloneTemplate } from '../utils/utils';
+import { cloneTemplate, ensureElement } from '../utils/utils';
 
 export class SuccessView {
   private node: HTMLElement;
@@ -7,12 +7,14 @@ export class SuccessView {
     this.node = cloneTemplate('#success');
   }
 
-  bindClose(handler: () => void) {
-    this.node.querySelector('.order-success__close')!
-      .addEventListener('click', handler);
-  }
-
   render(): HTMLElement {
     return this.node;
+  }
+
+  renderError(message: string): HTMLElement {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'modal__error';
+    errorDiv.textContent = message;
+    return errorDiv;
   }
 }
