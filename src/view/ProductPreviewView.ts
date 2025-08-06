@@ -29,3 +29,4 @@ export class ProductPreviewView {
     return this.node;
   }
 }
+
