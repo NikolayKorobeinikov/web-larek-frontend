@@ -4,27 +4,33 @@ import { IProduct } from '../types/model/Product';
 import { CartItemView } from './CartItemView';
 
 export class CartView {
-  private node: HTMLElement;
-  private list: HTMLElement;
-  private total: HTMLElement;
+	private node: HTMLElement;
+	private list: HTMLElement;
+	private total: HTMLElement;
+	private submitButton: HTMLButtonElement;
 
-  constructor(private events: EventEmitter) {
-    this.node = cloneTemplate('#basket');
-    this.list = ensureElement<HTMLElement>('.basket__list', this.node);
-    this.total = ensureElement<HTMLElement>('.basket__price', this.node);
-  }
+	constructor(private events: EventEmitter) {
+		this.node = cloneTemplate('#basket');
+		this.list = ensureElement<HTMLElement>('.basket__list', this.node);
+		this.total = ensureElement<HTMLElement>('.basket__price', this.node);
+		this.submitButton = ensureElement<HTMLButtonElement>('.basket__button', this.node);
 
-  setItems(items: IProduct[]) {
-    const itemViews = items.map((product, index) =>
-      new CartItemView(product, index + 1, this.events).render()
-    );
-    this.list.replaceChildren(...itemViews);
+		this.submitButton.addEventListener('click', () => {
+			this.events.emit('order:open');
+		});
+	}
 
-    const totalPrice = items.reduce((sum, item) => sum + item.price, 0);
-    this.total.textContent = `${totalPrice} синапсов`;
-  }
+	setItems(items: IProduct[]) {
+		const itemViews = items.map((product, index) =>
+			new CartItemView(product, index + 1, this.events).render()
+		);
+		this.list.replaceChildren(...itemViews);
 
-  render(): HTMLElement {
-    return this.node;
-  }
+		const totalPrice = items.reduce((sum, item) => sum + item.price, 0);
+		this.total.textContent = `${totalPrice} синапсов`;
+	}
+
+	render(): HTMLElement {
+		return this.node;
+	}
 }

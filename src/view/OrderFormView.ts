@@ -1,46 +1,84 @@
 import { EventEmitter } from '../components/base/events';
 import { ensureElement } from '../utils/utils';
+import { IOrderData } from '../types/model/OrderModel';
 
 export class OrderFormView {
-  private events: EventEmitter;
-  private element: HTMLElement;
-  private errorElement: HTMLElement;
+	private events: EventEmitter;
+	private element: HTMLElement;
+	private errorElement: HTMLElement;
+	private payOnlineButton: HTMLButtonElement;
+	private payOnDeliveryButton: HTMLButtonElement;
+	private addressInput: HTMLInputElement;
+	private nextButton: HTMLButtonElement;
 
-  constructor(events: EventEmitter) {
-    this.events = events;
+	private payment: IOrderData['payment'] = null;
+	private address: IOrderData['address'] = '';
 
-    const template = document.getElementById('order') as HTMLTemplateElement;
-    if (!template) {
-      throw new Error('Template #order not found');
-    }
+	constructor(events: EventEmitter) {
+		this.events = events;
 
-    this.element = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
+		const template = document.getElementById('order') as HTMLTemplateElement;
+		if (!template) {
+			throw new Error('Template #order not found');
+		}
 
-    this.errorElement = ensureElement<HTMLElement>('.form__errors', this.element);
+		this.element = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
 
-    this.initEvents();
-  }
+		this.errorElement = ensureElement<HTMLElement>('.form__errors', this.element);
+		this.payOnlineButton = ensureElement<HTMLButtonElement>('[name="card"]', this.element);
+		this.payOnDeliveryButton = ensureElement<HTMLButtonElement>('[name="cash"]', this.element);
+		this.addressInput = ensureElement<HTMLInputElement>('[name="address"]', this.element);
+		this.nextButton = ensureElement<HTMLButtonElement>('.order__button', this.element);
 
-  private initEvents() {
-    const form = this.element as HTMLFormElement;
+		this.initEvents();
+		this.updateSubmitState();
+	}
 
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const formData = new FormData(form);
-      const payment = formData.get('card') ? 'online' : formData.get('cash') ? 'cash' : null;
-      const address = formData.get('address') as string;
+	private initEvents() {
+		this.payOnlineButton.addEventListener('click', (e) => {
+			e.preventDefault();
+			this.payment = 'online';
+			this.highlightPayment();
+			this.events.emit('order:update', { key: 'payment', value: this.payment });
+			this.updateSubmitState();
+		});
 
-      this.events.emit('order:change', { key: 'payment', value: payment });
-      this.events.emit('order:change', { key: 'address', value: address });
-      this.events.emit('contacts:open');
-    });
-  }
+		this.payOnDeliveryButton.addEventListener('click', (e) => {
+			e.preventDefault();
+			this.payment = 'cash';
+			this.highlightPayment();
+			this.events.emit('order:update', { key: 'payment', value: this.payment });
+			this.updateSubmitState();
+		});
 
-  public render() {
-    return this.element;
-  }
+		this.addressInput.addEventListener('input', () => {
+			this.address = this.addressInput.value.trim();
+			this.events.emit('order:update', { key: 'address', value: this.address });
+			this.updateSubmitState();
+		});
 
-  public setErrors(message: string) {
-    this.errorElement.textContent = message;
-  }
+		this.nextButton.addEventListener('click', (e) => {
+			e.preventDefault();
+			if (this.payment && this.address) {
+				this.events.emit('contacts:open');
+			}
+		});
+	}
+
+	private highlightPayment() {
+		this.payOnlineButton.classList.toggle('button_alt-active', this.payment === 'online');
+		this.payOnDeliveryButton.classList.toggle('button_alt-active', this.payment === 'cash');
+	}
+
+	private updateSubmitState() {
+		this.nextButton.disabled = !(this.payment && this.address);
+	}
+
+	public render() {
+		return this.element;
+	}
+
+	public setErrors(message: string) {
+		this.errorElement.textContent = message;
+	}
 }
