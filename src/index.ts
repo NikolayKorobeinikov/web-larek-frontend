@@ -58,50 +58,50 @@ api.getProducts()
     events.emit('error:show', { message: 'Не удалось получить товары. Попробуйте позже.' });
   });
 
-
-
-events.on('products:loaded', ({ products }: { products: IProduct[] }) => {
+events.on('products:loaded', (data: { products: IProduct[] }) => {
   screenView.set('catalog');
-  const cards = products.map(p => new ProductCardView(p, events).render());
+  const cards = data.products.map((product: IProduct) =>
+    new ProductCardView(product, events).render()
+  );
   productListView.render(cards);
 });
 
-events.on('product:select', ({ id }: { id: string }) => {
-  const product = productModel.getById(id);
+events.on('product:select', (data: { id: string }) => {
+  const product = productModel.getById(data.id);
   if (!product) return;
 
-  const inCart = cartModel.has(id);
+  const inCart = cartModel.has(data.id);
   const previewNode = productPreviewView.render(product, inCart, () => {
-    events.emit(inCart ? 'cart:remove' : 'cart:add', { id });
+    events.emit(inCart ? 'cart:remove' : 'cart:add', { id: data.id });
     modalView.close();
   });
 
   modalView.open(previewNode);
   screenView.set('product');
-  window.scrollTo({ top: 0 });
 });
 
-events.on('cart:add', ({ id }: { id: string }) => {
-  const product = productModel.getById(id);
+events.on('cart:add', (data: { id: string }) => {
+  const product = productModel.getById(data.id);
   if (product) cartModel.add(product);
 });
 
-events.on('cart:remove', ({ id }: { id: string }) => {
-  cartModel.remove(id);
+events.on('cart:remove', (data: { id: string }) => {
+  cartModel.remove(data.id);
 });
 
-events.on('cart:changed', ({ items, total }: { items: IProduct[], total: number }) => {
-  cartCounterView.render(items.length);
-  const itemViews = items.map((product, index) =>
+events.on('cart:changed', (data: { items: IProduct[], total: number }) => {
+  cartCounterView.render(data.items.length);
+
+  const itemViews = data.items.map((product, index) =>
     new CartItemView(product, index + 1, events).render()
   );
-  cartView.setItems(itemViews, total);
+
+  cartView.setItems(itemViews, data.total);
 });
 
 events.on('cart:open', () => {
   screenView.set('cart');
   modalView.open(cartView.render());
-  window.scrollTo({ top: 0 });
 });
 
 events.on('order:open', () => {
@@ -112,25 +112,29 @@ events.on('order:open', () => {
 
   screenView.set('order');
   modalView.open(orderStep1View.render());
-  window.scrollTo({ top: 0 });
 });
 
 events.on('contacts:open', () => {
   screenView.set('contacts');
   modalView.open(orderStep2View.render());
-  window.scrollTo({ top: 0 });
 });
 
-events.on('order:change', ({ key, value }: { key: keyof IOrderData, value: string }) => {
-  orderModel.setData(key, value); 
+events.on('order:change', (data: { key: keyof IOrderData, value: string }) => {
+  orderModel.setData(data.key, data.value);
 });
 
 events.on('view:errors:update', (errors: Partial<IOrderFormErrors>) => {
-  const isValid = Object.keys(errors).length === 0;
-  orderStep1View.setErrors(errors);
-  orderStep1View.setSubmitState(isValid);
-  orderStep2View.setErrors(errors);
-  orderStep2View.setSubmitState(isValid);
+  orderStep1View.setErrors({
+    payment: errors.payment,
+    address: errors.address,
+  });
+  orderStep1View.setSubmitState(!errors.payment && !errors.address);
+
+  orderStep2View.setErrors({
+    email: errors.email,
+    phone: errors.phone,
+  });
+  orderStep2View.setSubmitState(!errors.email && !errors.phone);
 });
 
 events.on('order:submit', async () => {
@@ -142,30 +146,35 @@ events.on('order:submit', async () => {
   }
 
   try {
-		const response = await api.submitOrder(data) as unknown as { total: number };
-    const total = response.total ?? 0;
+    const fullData = {
+      ...data,
+      total: cartModel.getTotal(),
+      items: cartModel.getItems().map(item => item.id)
+    };
+
+    const response = await api.submitOrder(fullData);
+    const total = response.total ?? cartModel.getTotal();
 
     cartModel.clear();
     orderModel.reset();
 
     events.emit('order:success', { total });
-  } catch {
+  } catch (error) {
+    console.error('Ошибка при отправке заказа:', error);
     events.emit('error:show', { message: 'Ошибка оплаты' });
   }
 });
 
-events.on('order:success', ({ total }: { total: number }) => {
+events.on('order:success', (data: { total: number }) => {
   screenView.set('success');
-  modalView.open(successView.render(total));
+  modalView.open(successView.render(data.total));
   successView.onClose(() => {
     modalView.close();
     screenView.set('catalog');
   });
-  window.scrollTo({ top: 0 });
 });
 
-events.on('error:show', ({ message }: { message: string }) => {
+events.on('error:show', (data: { message: string }) => {
   screenView.set('error');
-  modalView.open(successView.renderError(message));
-  window.scrollTo({ top: 0 });
+  modalView.open(successView.renderError(data.message));
 });
