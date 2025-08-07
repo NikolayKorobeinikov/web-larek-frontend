@@ -1,34 +1,42 @@
-// components/models/CartModel.ts
-import { EventEmitter } from '../base/events';
 import { IProduct } from '../../types/model/Product';
+import { EventEmitter } from '../base/events';
 
 export class CartModel {
   private items: IProduct[] = [];
 
   constructor(private events: EventEmitter) {}
 
-  getItems(): IProduct[] {
+  public add(product: IProduct): void {
+    this.items.push(product);
+    this.emitChange();
+  }
+
+  public remove(id: string): void {
+    this.items = this.items.filter((item) => item.id !== id);
+    this.emitChange();
+  }
+
+  public getItems(): IProduct[] {
     return [...this.items];
   }
 
-  has(id: string): boolean {
-    return this.items.some(p => p.id === id);
+  public has(id: string): boolean {
+    return this.items.some((item) => item.id === id);
   }
 
-  add(product: IProduct) {
-    if (!this.has(product.id)) {
-      this.items.push(product);
-      this.events.emit('cart:changed', { items: this.getItems() });
-    }
-  }
-
-  remove(id: string) {
-    this.items = this.items.filter(p => p.id !== id);
-    this.events.emit('cart:changed', { items: this.getItems() });
-  }
-
-  clear() {
+  public clear(): void {
     this.items = [];
-    this.events.emit('cart:changed', { items: this.getItems() });
+    this.emitChange();
+  }
+
+  public getTotal(): number {
+    return this.items.reduce((sum, item) => sum + item.price, 0);
+  }
+
+  private emitChange(): void {
+    this.events.emit('cart:changed', {
+      items: this.getItems(),
+      total: this.getTotal()
+    });
   }
 }

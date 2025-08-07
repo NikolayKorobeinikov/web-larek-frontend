@@ -12,7 +12,6 @@ export class ModalView {
     this.root.addEventListener('click', (e) => {
       if (e.target === this.root) this.close();
     });
-    // Escape закрывает окно
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') this.close();
     });
