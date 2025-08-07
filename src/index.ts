@@ -100,13 +100,20 @@ events.on('cart:changed', (data: { items: IProduct[], total: number }) => {
 });
 
 events.on('cart:open', () => {
+  const items = cartModel.getItems();
+  const total = cartModel.getTotal();
+
+  const itemViews = items.map((product, index) =>
+    new CartItemView(product, index + 1, events).render()
+  );
+
+  cartView.setItems(itemViews, total);
   screenView.set('cart');
   modalView.open(cartView.render());
 });
 
 events.on('order:open', () => {
   if (cartModel.getItems().length === 0) {
-    events.emit('error:show', { message: 'Ваша корзина пуста' });
     return;
   }
 
