@@ -1,6 +1,6 @@
 import { EventEmitter } from '../components/base/events';
 import { ensureElement } from '../utils/utils';
-import { IOrderData } from '../types/model/OrderModel';
+import { IOrderData } from '../types/model/IOrderData';
 import { IOrderFormErrors } from '../types/model/OrderFormErrors';
 
 export class OrderFormView {

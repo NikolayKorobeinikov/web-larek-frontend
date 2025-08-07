@@ -1,4 +1,5 @@
 import './scss/styles.scss';
+
 import { EventEmitter } from './components/base/events';
 import { Api } from './components/base/api';
 import { LarekApi } from './api/LarekApi';
@@ -15,7 +16,7 @@ import { ProductPreviewView } from './view/ProductPreviewView';
 import { CartItemView } from './view/CartItemView';
 import { CartView } from './view/CartView';
 import { CartCounterView } from './view/CartCounterView';
-import { OrderFormView } from './view/OrderFormView';
+import { OrderStep1View } from './view/OrderStep1View';
 import { OrderStep2View } from './view/OrderStep2View';
 import { SuccessView } from './view/SuccessView';
 import { ScreenView } from './view/ScreenView';
@@ -24,8 +25,8 @@ import { ModalView } from './view/ModalView';
 
 import { IProductDto } from './types/api/dto/ProductDto';
 import { IProduct } from './types/model/Product';
-import { IOrderData } from './types/model/OrderModel';
-import { IOrderFormErrors } from './types/model/OrderFormErrors';
+import { IOrderData } from './types/model/IOrderData';
+import { IOrderFormErrors } from './types/model/IOrderFormErrors';
 
 const events = new EventEmitter();
 const api = new LarekApi(new Api(API_URL));
@@ -42,8 +43,8 @@ const productListView = new ProductListView(events);
 const productPreviewView = new ProductPreviewView();
 const cartCounterView = new CartCounterView();
 const cartView = new CartView(events);
-const orderFormView = new OrderFormView(events);
-const orderStep2View = new OrderStep2View();
+const orderStep1View = new OrderStep1View(events);
+const orderStep2View = new OrderStep2View(events);
 const successView = new SuccessView();
 
 screenView.set('loading');
@@ -56,6 +57,8 @@ api.getProducts()
   .catch(() => {
     events.emit('error:show', { message: 'Не удалось получить товары. Попробуйте позже.' });
   });
+
+
 
 events.on('products:loaded', ({ products }: { products: IProduct[] }) => {
   screenView.set('catalog');
@@ -89,11 +92,9 @@ events.on('cart:remove', ({ id }: { id: string }) => {
 
 events.on('cart:changed', ({ items, total }: { items: IProduct[], total: number }) => {
   cartCounterView.render(items.length);
-
   const itemViews = items.map((product, index) =>
     new CartItemView(product, index + 1, events).render()
   );
-
   cartView.setItems(itemViews, total);
 });
 
@@ -110,7 +111,7 @@ events.on('order:open', () => {
   }
 
   screenView.set('order');
-  modalView.open(orderFormView.render());
+  modalView.open(orderStep1View.render());
   window.scrollTo({ top: 0 });
 });
 
@@ -121,11 +122,15 @@ events.on('contacts:open', () => {
 });
 
 events.on('order:change', ({ key, value }: { key: keyof IOrderData, value: string }) => {
-  orderModel.setData(key, value);
+  orderModel.setData(key, value); 
 });
 
 events.on('view:errors:update', (errors: Partial<IOrderFormErrors>) => {
-  orderFormView.setErrors(errors);
+  const isValid = Object.keys(errors).length === 0;
+  orderStep1View.setErrors(errors);
+  orderStep1View.setSubmitState(isValid);
+  orderStep2View.setErrors(errors);
+  orderStep2View.setSubmitState(isValid);
 });
 
 events.on('order:submit', async () => {
@@ -137,7 +142,7 @@ events.on('order:submit', async () => {
   }
 
   try {
-    const response = await api.submitOrder(data) as unknown as { total: number };
+		const response = await api.submitOrder(data) as unknown as { total: number };
     const total = response.total ?? 0;
 
     cartModel.clear();

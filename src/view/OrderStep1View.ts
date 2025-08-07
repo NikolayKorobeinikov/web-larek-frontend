@@ -1,4 +1,6 @@
 import { cloneTemplate } from '../utils/utils';
+import { IOrderFormErrors } from '../types/model/OrderFormErrors';
+import { EventEmitter } from '../components/base/events';
 
 export class OrderStep1View {
   private node: HTMLElement;
@@ -6,9 +8,8 @@ export class OrderStep1View {
   private addressInput: HTMLInputElement;
   private errors: HTMLElement;
   private submit: HTMLButtonElement;
-  private selected: 'online' | 'cash' | null = null;
 
-  constructor() {
+  constructor(private events: EventEmitter) {
     this.node = cloneTemplate('#order');
     this.payBtns = this.node.querySelectorAll('.order__buttons .button');
     this.addressInput = this.node.querySelector('input[name="address"]')!;
@@ -16,37 +17,43 @@ export class OrderStep1View {
     this.submit = this.node.querySelector('.order__button')!;
 
     this.payBtns.forEach((b) => {
-      b.addEventListener('click', () => this.selectPayment(b));
+      b.addEventListener('click', () => {
+        const map: Record<string, 'online' | 'cash'> = { card: 'online', cash: 'cash' };
+        const payment = map[b.name];
+        this.events.emit('order:change', { key: 'payment', value: payment });
+        this.highlightPayment(payment);
+      });
     });
 
-    this.addressInput.addEventListener('input', () => this.validate());
-  }
+    this.addressInput.addEventListener('input', () => {
+      this.events.emit('order:change', {
+        key: 'address',
+        value: this.addressInput.value
+      });
+    });
 
-  private selectPayment(button: HTMLButtonElement) {
-    const map: Record<string, 'online' | 'cash'> = { card: 'online', cash: 'cash' };
-    this.selected = map[button.name];
-
-    this.payBtns.forEach(btn => btn.classList.toggle('button_alt', btn !== button));
-    this.validate();
-  }
-
-  private validate() {
-    const ok = this.selected && this.addressInput.value.trim().length > 3;
-    this.submit.disabled = !ok;
-    this.errors.textContent = ok ? '' : 'Выберите способ оплаты и укажите адрес';
-  }
-
-  bindSubmit(handler: (payment: 'online' | 'cash', address: string) => void) {
     this.node.addEventListener('submit', (e) => {
       e.preventDefault();
-      if (!this.submit.disabled && this.selected) {
-        handler(this.selected, this.addressInput.value);
-      }
+      this.events.emit('contacts:open');
     });
   }
 
-  render(): HTMLElement {
-    this.validate();
+  public highlightPayment(method: 'online' | 'cash') {
+    this.payBtns.forEach((btn) => {
+      btn.classList.toggle('button_alt-active', btn.name === (method === 'online' ? 'card' : 'cash'));
+    });
+  }
+
+  public setErrors(errors: Partial<IOrderFormErrors>) {
+    const messages = Object.values(errors).filter(Boolean).join('; ');
+    this.errors.textContent = messages;
+  }
+
+  public setSubmitState(isValid: boolean) {
+    this.submit.disabled = !isValid;
+  }
+
+  public render(): HTMLElement {
     return this.node;
   }
 }

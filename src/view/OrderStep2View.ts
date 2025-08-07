@@ -1,40 +1,51 @@
 import { cloneTemplate } from '../utils/utils';
+import { EventEmitter } from '../components/base/events';
+import { IOrderFormErrors } from '../types/model/IOrderFormErrors';
 
 export class OrderStep2View {
   private node: HTMLElement;
-  private email: HTMLInputElement;
-  private phone: HTMLInputElement;
+  private emailInput: HTMLInputElement;
+  private phoneInput: HTMLInputElement;
   private submit: HTMLButtonElement;
   private errors: HTMLElement;
 
-  constructor() {
+  constructor(private events: EventEmitter) {
     this.node = cloneTemplate('#contacts');
-    this.email = this.node.querySelector('input[name="email"]')!;
-    this.phone = this.node.querySelector('input[name="phone"]')!;
+    this.emailInput = this.node.querySelector('input[name="email"]')!;
+    this.phoneInput = this.node.querySelector('input[name="phone"]')!;
     this.submit = this.node.querySelector('button[type="submit"]')!;
     this.errors = this.node.querySelector('.form__errors')!;
 
-    this.email.addEventListener('input', () => this.validate());
-    this.phone.addEventListener('input', () => this.validate());
-  }
+    this.emailInput.addEventListener('input', () => {
+      this.events.emit('order:change', {
+        key: 'email',
+        value: this.emailInput.value,
+      });
+    });
 
-  private validate() {
-    const ok = /\S+@\S+\.\S+/.test(this.email.value) && this.phone.value.trim().length >= 6;
-    this.submit.disabled = !ok;
-    this.errors.textContent = ok ? '' : 'Заполните Email и телефон';
-  }
+    this.phoneInput.addEventListener('input', () => {
+      this.events.emit('order:change', {
+        key: 'phone',
+        value: this.phoneInput.value,
+      });
+    });
 
-  bindSubmit(handler: (email: string, phone: string) => void) {
     this.node.addEventListener('submit', (e) => {
       e.preventDefault();
-      if (!this.submit.disabled) {
-        handler(this.email.value, this.phone.value);
-      }
+      this.events.emit('order:submit');
     });
   }
 
-  render(): HTMLElement {
-    this.validate();
+  public setErrors(errors: Partial<IOrderFormErrors>) {
+    const messages = Object.values(errors).filter(Boolean).join('; ');
+    this.errors.textContent = messages;
+  }
+
+  public setSubmitState(isValid: boolean) {
+    this.submit.disabled = !isValid;
+  }
+
+  public render(): HTMLElement {
     return this.node;
   }
 }
